@@ -32,8 +32,8 @@ const databaseLoader = (http, client, wipeOnStartup, mongoose, models) => {
         console.log('-----WIPING DATABASE-----')
         await wipeUpdatesDB()
         console.log('Updates DB wiped')
-        client.set("latestBlockNum", 0);
-        console.log('latestBlockNum DB wiped')
+        client.set("lastProcessed", 580);
+        console.log('lastProcessed DB wiped')
         await loadDefaultPlaces()
         console.log('Place Cache reset')
 
@@ -150,8 +150,8 @@ const databaseLoader = (http, client, wipeOnStartup, mongoose, models) => {
     }
 
     const storeRedisPlaceInfo = async (x, y, color ) => {
-        console.log('!----------REDIS----------------')
-        console.log({x,y,color})
+        //console.log('!----------REDIS----------------')
+        //console.log({x,y,color})
         let place = await new Promise((resolver) => {
             client.get("place", (err, place) => {
                 resolver(place)
@@ -160,8 +160,8 @@ const databaseLoader = (http, client, wipeOnStartup, mongoose, models) => {
         let xPos = x * 3
         let yMod = y * 2997
         let startingPos = xPos + yMod
-        console.log({xPos, yMod, startingPos})
-        console.log({changing: place.substring(startingPos, startingPos + 3)})
+        //console.log({xPos, yMod, startingPos})
+        //console.log({changing: place.substring(startingPos, startingPos + 3)})
         client.set("place", stringSplice(place, startingPos, 3, color))
 
         place = await new Promise((resolver) => {
@@ -169,14 +169,14 @@ const databaseLoader = (http, client, wipeOnStartup, mongoose, models) => {
                 resolver(place)
             })
         })
-        console.log({changed: place.substring(startingPos, startingPos + 3)})
-        console.log('-----------REDIS--------------!')
+        //console.log({changed: place.substring(startingPos, startingPos + 3)})
+        //console.log('-----------REDIS--------------!')
     }
 
     const storeMongooseUpdate = async (x, y, color, timestamp ) => {
-        console.log('!---------MONGOOSE--------------')
+        //console.log('!---------MONGOOSE--------------')
         new models.Updates({x, y, color, timestamp: new Date(timestamp * 1000)}).save()
-        console.log('-----------MONGOOSE-------------!')
+        //console.log('-----------MONGOOSE-------------!')
     }
 
     const getBlock_MN = (blockNum) => {
@@ -237,17 +237,21 @@ const databaseLoader = (http, client, wipeOnStartup, mongoose, models) => {
     }
 
     client.get("lastProcessed", async function(err, lastProcessed) {
-        if (lastProcessed == null) {
-            client.set("lastProcessed", 0)
-            currBlockNum = 0
-        } else {
-            currBlockNum = Number(lastProcessed)
-        }
         console.log('wipeOnStartup', wipeOnStartup)
         if (wipeOnStartup) {
             await wipeDB()
             wipeOnStartup = false
+            lastProcessed = 580
         }
+
+        console.log({lastProcessed})
+        if (lastProcessed == null) {
+            client.set("lastProcessed", 580)
+            currBlockNum = 580
+        } else {
+            currBlockNum = Number(lastProcessed)
+        }
+
         //await wipeUpdatesDB()
         timerId = setTimeout(checkForBlocks, 0);
     });
@@ -264,8 +268,6 @@ module.exports = (wipeOnStartup, client, mongoose) => {
     });
 
     var Updates = mongoose.model('Updates', updates, 'updates');
-
-    updates
 
     databaseLoader(http, client, wipeOnStartup, mongoose, {Updates});
 };

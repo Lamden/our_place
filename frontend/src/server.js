@@ -23,8 +23,7 @@ mongoose.connect(
 	connection,
 	{useNewUrlParser: true, useUnifiedTopology: true}, (error) => {
 		if (!error) explorer(wipeOnStartup, client, mongoose)
-	}
-	)
+	})
 
 client.on("error", function(error) {
 
