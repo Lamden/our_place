@@ -4,20 +4,25 @@ import compression from 'compression';
 import * as sapper from '@sapper/server';
 
 const { PORT, NODE_ENV } = process.env;
+
+console.log(NODE_ENV)
 const dev = NODE_ENV === 'development';
 const DBUSER = process.env.DBUSER || 'myUserAdmin'
 const DBPWD = process.env.DBPWD || 'dbadmin'
+var wipeOnStartup = process.env.WIPE === 'yes' ? true : false;
 
 import explorer from './blockexplorer'
 
 const redis = require("redis");
 const client = redis.createClient();
 const mongoose = require('mongoose');
+let connection = `mongodb://${DBUSER}:${DBPWD}@127.0.0.1:27017/places?authSource=admin`
+if (NODE_ENV === "production") connection = `mongodb://127.0.0.1:27017/places`
 
 mongoose.connect(
-	`mongodb://${DBUSER}:${DBPWD}@127.0.0.1:27017/places?authSource=admin`,
+	connection,
 	{useNewUrlParser: true, useUnifiedTopology: true}, (error) => {
-		if (!error) explorer(false, client, mongoose)
+		if (!error) explorer(wipeOnStartup, client, mongoose)
 	}
 	)
 

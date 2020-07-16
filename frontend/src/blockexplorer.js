@@ -1,10 +1,5 @@
 'use strict';
 
-
-const DBUSER = process.env.DBUSER || 'myUserAdmin'
-const DBPWD = process.env.DBPWD || 'dbadmin'
-var wipeOnStartup = process.env.WIPE === 'no' ? false : true;
-
 const validators = require('types-validate-assert')
 const { validateTypes } = validators;
 const stringSplice = require("underscore.string/splice")
