@@ -1,0 +1,115 @@
+<script>
+    import { onMount } from 'svelte';
+    import { fly } from 'svelte/transition';
+	import { quintOut } from 'svelte/easing';
+
+    import { snackbars } from '../js/stores.js';
+
+    import check_icon from '../../static/img/check-filled.svg'
+    import warning_icon from '../../static/img/warning-filled.svg'
+    import error_icon from '../../static/img/error-filled.svg'
+    import info_icon from '../../static/img/info-filled.svg'
+
+    const icons = {
+        "warning": warning_icon,
+        "success": check_icon,
+        "error": error_icon,
+        "info": info_icon
+    }
+
+    let remover;
+
+    onMount(() => {
+        let remover = setInterval(autoClose, 100)
+        return(() => clearInterval(remover))
+    })
+
+    const autoClose = () => {
+        snackbars.update( curr => {
+             return curr.filter((snack ) => {return (new Date().getTime() - snack.time) < 5000})
+        })
+    }
+</script>
+
+<style>
+    .snack-container{
+        position: fixed;
+        pointer-events: none;
+        top: 0;
+        right: 0;
+        width: 300px;
+        height: 100%;
+        z-index: 100;
+        padding: 1rem 1rem 0 0;
+        box-sizing: border-box;
+        overflow: hidden;
+    }
+    .snackbar{
+        justify-content: space-evenly;
+        padding: 8px;
+        margin-bottom: 1rem;
+        box-shadow: 2px 6px 19px 0px rgba(0,0,0,0.29);
+        overflow-x: hidden;
+    }
+    .top-bar{
+        align-items: center;
+        margin: 0 0 0.5em;
+    }
+    .icon{
+        width: 19px;
+        margin-right: 5px;
+    }
+    .title{
+        font-size: 0.9em;
+        font-weight: 600;
+    }
+    .snack-body{
+        margin: 0;
+        font-size: 0.8em;
+        line-height: 1.1;
+        font-weight: 300;
+        word-break: break-word;
+    }
+    .success{
+        background: forestgreen;
+        border: 1px solid darkgreen;
+        color: #ebffec;
+    }
+    .error{
+        background: indianred;
+        border: 1px solid darkred;
+        color: #ffecec;
+    }
+    .info{
+        background: #ff5bb0;
+        border: 1px solid #afafaf;
+        color: #fff5fa;
+    }
+    .warning{
+        background: khaki;
+        border: 1px solid #dec157;
+        color: #4b4b4b;
+    }
+    p{
+        margin: 0;
+    }
+
+</style>
+<div class="snack-container">
+     {#each $snackbars as snack, index}
+        <div class="flex-col snackbar"
+             class:success={snack.type === "success"}
+             class:error={snack.type === "error"}
+             class:warning={snack.type === "warning"}
+             class:info={snack.type === "info"}
+             in:fly="{{delay: 0, duration: 400, x: 200, y: 0, opacity: 0.5, easing: quintOut}}"
+             out:fly="{{delay: 0, duration: 200, x: 400, y: 0, opacity: 0.5, easing: quintOut}}">
+
+            <div class="top-bar flex-row">
+                <div class="icon">{@html icons[snack.type]}</div>
+                <p class="title">{snack.title}</p>
+            </div>
+            <p class="snack-body">{snack.body}</p>
+        </div>
+    {/each}
+</div>
