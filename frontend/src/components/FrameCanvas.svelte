@@ -15,7 +15,7 @@
 
     onMount(() => {
         handleResize();
-        drawPlace(15)
+        drawPlace(20)
     })
     afterUpdate(() => drawPlace(1))
 
@@ -27,23 +27,16 @@
     }
 
     const drawPlace = (scale) => {
-        console.log(pixels.substring(1000, 1009))
         if (!pixels || !canvasElm) return
         let ctx = canvasElm.getContext('2d')
         ctx.clearRect(0, 0, canvasElm.width, canvasElm.height);
         ctx.scale(scale, scale)
 
         console.log('drawing')
-        for (let index = 0; index <= 299999; index = index + 3){
+        for (let index = 0; index <= 2999999; index = index + 3){
             ctx.fillStyle = `#${pixels.substring(index, index + 3)}`;
-            let y = Math.floor(index / 2997)
-            let x = Math.floor((index - (y*2997) ) /3)
-            if (index >= 0 && index <= 30) {
-                console.log({index, x,y,color: pixels.substring(index, index + 3)})
-            }
-            if (index >= 998 && index <= 1009) {
-                console.log({index, x,y,color: pixels.substring(index, index + 3)})
-            }
+            let y = Math.floor(index / 3000)
+            let x = Math.floor((index - (y * 3000) )) / 3
             ctx.fillRect(x, y, pixelSize, pixelSize);
         }
         console.log('done drawing')
@@ -85,8 +78,8 @@
 <canvas
         id={id}
         bind:this={canvasElm}
-        width="100%"
-        height="100%"
+        width="1000"
+        height="1000"
         on:click={handleClick}
 />
 <svelte:window on:resize|passive={handleResize} />

@@ -1,5 +1,6 @@
 'use strict';
 
+const config = require('./js/config').config
 const validators = require('types-validate-assert')
 const { validateTypes } = validators;
 const stringSplice = require("underscore.string/splice")
@@ -27,13 +28,15 @@ const databaseLoader = (http, client, wipeOnStartup, mongoose, models) => {
     let currBatchMax = 0;
     let batchAmount = 25;
     let timerId;
+    let updateQueue = []
 
     const wipeDB = async () => {
         console.log('-----WIPING DATABASE-----')
         await wipeUpdatesDB()
         console.log('Updates DB wiped')
-        client.set("lastProcessed", 580);
+        client.set("lastProcessed", 787);
         console.log('lastProcessed DB wiped')
+        client.flushdb();
         await loadDefaultPlaces()
         console.log('Place Cache reset')
 
@@ -65,6 +68,7 @@ const databaseLoader = (http, client, wipeOnStartup, mongoose, models) => {
                 }
             }
         })
+
         await promise.then((place) => {
             client.set(`place`, place);
         })
@@ -112,7 +116,7 @@ const databaseLoader = (http, client, wipeOnStartup, mongoose, models) => {
             if (typeof blockInfo.subblocks !== 'undefined'){
                 blockInfo.subblocks.forEach(sb => {
                     sb.transactions.forEach((tx) => {
-                        if (tx.transaction.payload.contract === 'con_our_place_test3' &&
+                        if (tx.transaction.payload.contract === config.smartContract &&
                             tx.transaction.payload.function === 'colorPixel'){
                             if (tx.result === "None"){
                                 if (Array.isArray(tx.state)){
@@ -121,19 +125,15 @@ const databaseLoader = (http, client, wipeOnStartup, mongoose, models) => {
                                         let variableName = s.key.split(":")[0].split(".")[1]
                                         let changeInfo = s.key.split(/:(.+)/)[1].split(":")
 
-                                        if (contractName === "con_our_place_test3" &&
+                                        if (contractName === config.smartContract &&
                                             variableName === "S"){
-                                            storeRedisPlaceInfo(
-                                                Number(changeInfo[0]),
-                                                Number(changeInfo[1]),
-                                                s.value
-                                            )
-                                            storeMongooseUpdate(
-                                                changeInfo[0],
-                                                changeInfo[1],
-                                                s.value,
-                                                tx.transaction.metadata.timestamp
-                                            )
+
+                                            updateQueue.push({
+                                                x: Number(changeInfo[0]),
+                                                y: Number(changeInfo[1]),
+                                                color: s.value,
+                                                timestamp: tx.transaction.metadata.timestamp * 1000
+                                            })
                                         }
                                     })
                                 }
@@ -149,34 +149,60 @@ const databaseLoader = (http, client, wipeOnStartup, mongoose, models) => {
         }
     }
 
-    const storeRedisPlaceInfo = async (x, y, color ) => {
-        //console.log('!----------REDIS----------------')
-        //console.log({x,y,color})
-        let place = await new Promise((resolver) => {
-            client.get("place", (err, place) => {
-                resolver(place)
-            })
-        })
-        let xPos = x * 3
-        let yMod = y * 2997
-        let startingPos = xPos + yMod
-        //console.log({xPos, yMod, startingPos})
-        //console.log({changing: place.substring(startingPos, startingPos + 3)})
-        client.set("place", stringSplice(place, startingPos, 3, color))
-
-        place = await new Promise((resolver) => {
-            client.get("place", (err, place) => {
-                resolver(place)
-            })
-        })
-        //console.log({changed: place.substring(startingPos, startingPos + 3)})
-        //console.log('-----------REDIS--------------!')
+    const processUpdateQueue = async () => {
+        if (updateQueue.length === 0) {
+            setTimeout(processUpdateQueue, 100)
+            return
+        }else{
+            let update = updateQueue.shift()
+            console.log(`doing ${update.x}:${update.y}`)
+            await storeRedisPlaceInfo(update.x, update.y, update.color, update.timestamp)
+            processUpdateQueue()
+        }
     }
 
-    const storeMongooseUpdate = async (x, y, color, timestamp ) => {
-        //console.log('!---------MONGOOSE--------------')
-        new models.Updates({x, y, color, timestamp: new Date(timestamp * 1000)}).save()
-        //console.log('-----------MONGOOSE-------------!')
+    const storeRedisPlaceInfo = (x, y, color, timestamp ) => {
+        return new Promise((resolve) => {
+            client.get(`${x}:${y}`, function(err, prev_timestamp){
+                console.log({x,y,color, prev_timestamp, timestamp})
+                console.log(Number(prev_timestamp) < timestamp)
+                if (Number(prev_timestamp) < timestamp || prev_timestamp == null){
+                    console.log("!!!! REDIS !!!! CREATING REDIS !!!!")
+                    client.get("place", function (err, place){
+                        let xPos = x * 3
+                        let yMod = y * 3000
+                        let startingPos = xPos + yMod
+                        if (place.substring(startingPos, startingPos + 3) !== color){
+                            client.set("place", stringSplice(place, startingPos, 3, color), () => {
+                                console.log(`resolving ${x}:${y}`)
+                                resolve()
+                            })
+                            client.set(`${x}:${y}`, timestamp)
+                            storeMongooseUpdate(x, y, color, timestamp)
+                        }else resolve()
+                    })
+                }else resolve()
+            })
+        })
+    }
+
+    const storeMongooseUpdate = (x, y, color, timestamp ) => {
+        models.Updates.findOne({x, y}, function(err, pixel) {
+            if(!err) {
+                if(!pixel) {
+                    console.log("!!!! MONGO !!!!! Creating NEW update !!!!")
+                    pixel = new models.Updates({x, y, color, timestamp: new Date(timestamp)})
+                    pixel.save()
+                }else{
+                    if (pixel.timestamp < new Date(timestamp)){
+                        console.log("!!!! MONGO !!!!! MODIFYTING UPDATE !!!!")
+                        pixel.color = color;
+                        pixel.timestamp = new Date(timestamp);
+                        pixel.save()
+                    }else console.log("!!!! MONGO !!!!! NEWER UPDATE !!!!")
+                }
+            }else console.log(err)
+        });
     }
 
     const getBlock_MN = (blockNum) => {
@@ -184,7 +210,7 @@ const databaseLoader = (http, client, wipeOnStartup, mongoose, models) => {
     }
 
     const getLatestBlock_MN = () => {
-        console.log('getting latest block number')
+        //console.log('getting latest block number')
         return new Promise((resolve, reject) => {
             const returnRes = async (res) => {
                 resolve(res)
@@ -196,19 +222,17 @@ const databaseLoader = (http, client, wipeOnStartup, mongoose, models) => {
     const checkForBlocks = async () => {
         let response = await getLatestBlock_MN()
 
-        //models.Updates.find({}).then(res => console.log(res))
-
         if (!response.error){
             latestBlockNum = response.number
             if (latestBlockNum < currBlockNum){
                 await wipeDB();
                 wipeOnStartup = false;
             }else{
-                console.log('lastestBlockNum: ' + latestBlockNum)
-                console.log('currBlockNum: ' + currBlockNum)
+                //console.log('lastestBlockNum: ' + latestBlockNum)
+                //console.log('currBlockNum: ' + currBlockNum)
                 if (latestBlockNum === currBlockNum){
                     if (alreadyCheckedCount < maxCheckCount) alreadyCheckedCount = alreadyCheckedCount + 1;
-                    checkNextIn = 500 * alreadyCheckedCount;
+                    checkNextIn = 100 * alreadyCheckedCount;
                     timerId = setTimeout(checkForBlocks, checkNextIn);
                 }
 
@@ -237,22 +261,24 @@ const databaseLoader = (http, client, wipeOnStartup, mongoose, models) => {
     }
 
     client.get("lastProcessed", async function(err, lastProcessed) {
+
         console.log('wipeOnStartup', wipeOnStartup)
         if (wipeOnStartup) {
             await wipeDB()
             wipeOnStartup = false
-            lastProcessed = 580
+            lastProcessed = 787
         }
 
         console.log({lastProcessed})
         if (lastProcessed == null) {
-            client.set("lastProcessed", 580)
-            currBlockNum = 580
+            client.set("lastProcessed", 0)
+            currBlockNum = 0
         } else {
             currBlockNum = Number(lastProcessed)
         }
 
         //await wipeUpdatesDB()
+        processUpdateQueue()
         timerId = setTimeout(checkForBlocks, 0);
     });
 }
@@ -261,8 +287,8 @@ module.exports = (wipeOnStartup, client, mongoose) => {
     const http = require('https');
 
     var updates = new mongoose.Schema({
-        x:  String,
-        y: String,
+        x: Number,
+        y: Number,
         color: String,
         timestamp: Date
     });

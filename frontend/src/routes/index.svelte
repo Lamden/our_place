@@ -19,6 +19,7 @@
 	export let timestamp;
 
 	onMount(() => {
+		console.log({pixels})
 		updateLastUpdate(timestamp)
 		let updater = setInterval(update, 1500)
 		return(() => clearInterval(updater))
@@ -38,7 +39,7 @@
 		updates.forEach(update => {
 			console.log(update)
 			let xPos = Number(update.x) * 3
-			let yMod = Number(update.y) * 2997
+			let yMod = Number(update.y) * 3000
 			let startingPos = xPos + yMod
 			console.log({xPos, yMod, startingPos})
 			newPixels = splice(pixels, startingPos, 3, update.color)

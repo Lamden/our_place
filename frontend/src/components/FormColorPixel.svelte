@@ -51,9 +51,9 @@
 	{#if $showModal.modalData.event}
 		<form id="changeColor" class="flex-col" on:submit|preventDefault={changeColor}>
 			<label for="x">X Position</label>
-			<input id="x" type="text" readonly value={$showModal.modalData.event.xPos}/>
+			<input id="x" type="text" bind:value={$showModal.modalData.event.xPos}/>
 			<label for="y">Y Position</label>
-			<input id="y" type="text" readonly value={$showModal.modalData.event.yPos}/>
+			<input id="y" type="text" bind:value={$showModal.modalData.event.yPos}/>
 			<input
 				type="submit"
 				class="button_text outlined"
