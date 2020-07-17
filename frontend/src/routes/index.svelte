@@ -21,7 +21,7 @@
 	onMount(() => {
 		console.log({pixels})
 		updateLastUpdate(timestamp)
-		let updater = setInterval(update, 1500)
+		let updater = setInterval(update, 800)
 		return(() => clearInterval(updater))
 	})
 

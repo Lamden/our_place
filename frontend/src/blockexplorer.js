@@ -177,8 +177,9 @@ const databaseLoader = (http, client, wipeOnStartup, mongoose, models) => {
                                 console.log(`resolving ${x}:${y}`)
                                 resolve()
                             })
-                            client.set(`${x}:${y}`, timestamp)
-                            storeMongooseUpdate(x, y, color, timestamp)
+                            client.set(`${x}:${y}`, timestamp, () => {
+                                storeMongooseUpdate(x, y, color, timestamp)
+                            })
                         }else resolve()
                     })
                 }else resolve()
