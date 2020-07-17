@@ -26,7 +26,9 @@
 	})
 
 	const update = async () => {
-		const res = await fetch(`update.json?timestamp=${localStorage.getItem("lastUpdate")}`);
+		let lastUpdate = new Date(localStorage.getItem("lastUpdate"));
+		lastUpdate.setSeconds(lastUpdate.getSeconds() - 5);
+		const res = await fetch(`update.json?timestamp=${lastUpdate.toString()}`);
 		const data = await res.json()
 		if (data.updates.length > 0) {
 			updateLastUpdate(data.timestamp)
@@ -42,17 +44,18 @@
 			let yMod = Number(update.y) * 3000
 			let startingPos = xPos + yMod
 			console.log({xPos, yMod, startingPos})
-			newPixels = splice(pixels, startingPos, 3, update.color)
-			console.log(newPixels.substring(startingPos, startingPos + 3))
+			if (newPixels.substring(startingPos, startingPos + 3) !== update.color){
+				newPixels = splice(pixels, startingPos, 3, update.color)
+				console.log(newPixels.substring(startingPos, startingPos + 3))
 
-			createSnack(
-				"Pixel Updated",
-				`${update.x},${update.y} now #${update.color}`,
-				'success'
-			)
+				createSnack(
+					"Pixel Updated",
+					`${update.x},${update.y} now #${update.color}`,
+					'success'
+				)
+			}
 		})
 		pixels = newPixels
-
 	}
 
 	const updateLastUpdate = (timestamp) => {
